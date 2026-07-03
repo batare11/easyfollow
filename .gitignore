@@ -1,0 +1,18 @@
+# 忽略编译/缓存/dist
+dist/
+build/
+*.pyc
+__pycache__/
+
+# 忽略浏览器数据
+chrome_profile_*/
+Cookies
+Cache/
+Local Storage/
+Extension State/
+GCM Store/
+
+# IDE 配置
+.idea/
+.vscode/
+*.iml
