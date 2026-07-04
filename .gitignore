@@ -12,6 +12,9 @@ Local Storage/
 Extension State/
 GCM Store/
 
+# 运行时数据
+data/
+
 # IDE 配置
 .idea/
 .vscode/

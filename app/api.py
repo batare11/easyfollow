@@ -43,3 +43,6 @@ class ApiClient:
 
     def load_ttl(self):
         return self._post(config.ENDPOINT_LOAD_TTL, {})
+
+    def home_data(self):
+        return self._post(config.ENDPOINT_HOME_DATA, {})

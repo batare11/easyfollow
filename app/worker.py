@@ -2,6 +2,7 @@ import queue
 import threading
 import time
 import traceback
+import json
 from concurrent.futures import ThreadPoolExecutor
 
 from . import config, cdp, api
@@ -41,9 +42,9 @@ def worker_loop(sess, stop_event, msg_queue):
     def orders(list_data):
         msg_queue.put(("orders", list_data))
 
-    POLL = max(0.5, float(sess.poll_interval or config.DEFAULT_POLL_INTERVAL))
-    CONC = max(1, int(getattr(sess, "concurrency", 1) or 1))
-    log(f"任务已启动 | 端口 {sess.port} | 轮询 {POLL}s | 并发 {CONC}")
+    poll = max(0.5, float(getattr(sess, "poll_interval", config.DEFAULT_POLL_INTERVAL) or config.DEFAULT_POLL_INTERVAL))
+    conc = max(1, int(getattr(sess, "concurrency", 10) or 10))
+    log(f"任务已启动 | 端口 {sess.port} | 轮询 {poll}s | 并发 {conc}")
 
     # 阶段一：登录检测
     if sess.token_expired or not sess.token:
@@ -84,75 +85,98 @@ def worker_loop(sess, stop_event, msg_queue):
     # 阶段二：上线 + 主循环
     client = api.ApiClient(sess.token, add_bearer=sess.add_bearer)
     try:
-        r = client.online()
-        if r.get("code") == 1000:
-            log("已主动上线")
-            status(online_active=True, online_remaining=config.ONLINE_MAX_SECONDS)
+        # 先查询剩余在线时间，不到阈值才上线
+        tr = client.load_ttl()
+        remain = tr.get("data") if tr.get("code") == 1000 else None
+        if remain is None or (isinstance(remain, (int, float)) and remain <= config.RE_ONLINE_THRESHOLD):
+            r = client.online()
+            if r.get("code") == 1000:
+                log("已主动上线")
+                status(online_active=True, online_remaining=config.ONLINE_MAX_SECONDS)
+            else:
+                log(f"上线返回: {r.get('message')}")
         else:
-            log(f"上线返回: {r.get('message')}")
+            log(f"在线剩余 {int(remain) if remain else '?'}s，无需重复上线")
+            status(online_active=True, online_remaining=remain)
     except Exception as e:
-        log(f"上线异常: {e}")
+        log(f"初始化在线检查异常: {e}")
 
     # 已接单去重集合（进程内）
     accepted = set()
     accepted_lock = threading.Lock()
-    stats = {"grab": 0, "assign": 0}
+    stats = {"grab": int(getattr(sess, "grab_count", 0) or 0),
+             "assign": int(getattr(sess, "assign_count", 0) or 0)}
+    status(order_stats=(stats["grab"], stats["assign"]))
+    # 持久线程池，避免重复创建开销
+    accept_pool = ThreadPoolExecutor(max_workers=conc, thread_name_prefix="accept")
 
     def do_accept(order_obj, source):
-        """返回 (是否处理, 是否成功); 重复单返回 False。"""
+        """在 accept_pool 中异步执行接单。"""
         order_no = (order_obj or {}).get("orderNo", "")
         if not order_no:
-            return False, False
+            return
         with accepted_lock:
             if order_no in accepted:
-                return False, False
+                return
             accepted.add(order_no)
         st = (order_obj or {}).get("status") or ""
-        try:
-            ar = client.accept(order_no)
-            ok = ar.get("code") == 1000
-            if ok:
-                with accepted_lock:
-                    if st == "assigned":
-                        stats["assign"] += 1
-                    else:
-                        stats["grab"] += 1
-                status(order_stats=(stats["grab"], stats["assign"]))
-            return True, ok
-        except Exception:
-            return True, False
+        kind = "派单" if st == "assigned" else "抢单"
+        def _run():
+            try:
+                ar = client.accept(order_no)
+                ok = ar.get("code") == 1000
+                if ok:
+                    with accepted_lock:
+                        if st == "assigned":
+                            stats["assign"] += 1
+                        else:
+                            stats["grab"] += 1
+                    sess.grab_count = stats["grab"]
+                    sess.assign_count = stats["assign"]
+                    sess.save()
+                    status(order_stats=(stats["grab"], stats["assign"]))
+                    log(f"[{source}][{kind}] 接单成功: {order_no} | USDT {order_obj.get('usdtAmount')} | 率 {order_obj.get('settleRate')}")
+                else:
+                    log(f"[{source}][{kind}] 接单失败: {order_no} | {ar.get('message')}")
+            except Exception as e:
+                log(f"[{source}][{kind}] 接单异常: {order_no} | {e}")
+        accept_pool.submit(_run)
 
     def accept_list(lst, source):
         if not lst:
             return
-        n = max(1, int(getattr(sess, "concurrency", 1) or 1))
-        processed = 0
-        success = 0
-        if n == 1 or len(lst) == 1:
-            for o in lst:
-                p, ok = do_accept(o, source)
-                if p:
-                    processed += 1
-                    if ok:
-                        success += 1
-        else:
-            with ThreadPoolExecutor(max_workers=n) as ex:
-                results = list(ex.map(lambda o: do_accept(o, source), list(lst)))
-            for p, ok in results:
-                if p:
-                    processed += 1
-                    if ok:
-                        success += 1
-        log(f"[{source}] 收到 {len(lst)} 个订单 → 自动接单 {success}/{processed}")
+        _save_orders(lst)
+        for o in lst:
+            do_accept(o, source)
+        log(f"[{source}] 收到 {len(lst)} 个 → 已提交")
+
+    def _save_orders(lst):
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        for o in lst:
+            line = json.dumps({"ts": ts, "order": o}, ensure_ascii=False) + "\n"
+            try:
+                with open(config.orders_log_file(sess.port), "a", encoding="utf-8") as f:
+                    f.write(line)
+                st = (o or {}).get("status", "")
+                if st != "assigned":
+                    with open(config.grab_log_file(sess.port), "a", encoding="utf-8") as f:
+                        f.write(line)
+            except Exception:
+                pass
 
     # Socket 实时通道（主）
     sock = None
+    def _on_order(lst):
+        if lst:
+            accept_list(lst, "Socket")
     try:
         sock = SocketOrderClient(
             token=sess.token,
             add_bearer=sess.add_bearer,
-            on_order=lambda lst: (orders(lst or []), accept_list(lst, "Socket")),
-            on_status=(lambda **kw: status(**{("socket_" + k): v for k, v in kw.items()})),
+            poll_interval=sess.poll_interval,
+            port=sess.port,
+            on_order=_on_order,
+            on_status=(lambda **kw: status(**kw)),
             on_log=(lambda m: log(m)),
         )
         sock.connect_async()
@@ -160,13 +184,11 @@ def worker_loop(sess, stop_event, msg_queue):
         log(f"Socket 初始化异常: {e}")
 
     # HTTP 兜底轮询间隔放宽（Socket 已是主通道）
-    http_poll = max(8.0, POLL * 4)
-    log(f"HTTP 兜底轮询间隔: {int(http_poll)}s")
 
     last_poll = 0.0
     last_ttl = 0.0
     last_token_refresh = 0.0
-    no_order_log_tick = 0
+    last_home = 0.0
 
     while not stop_event.is_set():
         now = time.time()
@@ -203,8 +225,8 @@ def worker_loop(sess, stop_event, msg_queue):
             except Exception:
                 pass
 
-        # HTTP 兜底查询订单
-        if now - last_poll >= http_poll:
+        # HTTP 兜底查询订单（与 Socket 同频）
+        if now - last_poll >= poll:
             last_poll = now
             try:
                 resp = client.my_orders()
@@ -215,13 +237,22 @@ def worker_loop(sess, stop_event, msg_queue):
                     if lst:
                         accept_list(lst, "HTTP")
                     else:
-                        no_order_log_tick += 1
-                        if no_order_log_tick % 12 == 0:
-                            log("暂无订单，持续监听中...")
+                        log("[HTTP] 收到 0 个")
                 else:
                     log(f"查询订单失败: code={code} msg={resp.get('message')}")
             except Exception as e:
                 log(f"查询订单异常: {e}")
+
+        # 总单查询
+        if now - last_home >= 5:
+            last_home = now
+            try:
+                hr = client.home_data()
+                if hr.get("code") == 1000:
+                    hd = hr.get("data") or {}
+                    status(home_total=hd.get("progressTotal", 0))
+            except Exception:
+                pass
 
         # 在线保持
         if now - last_ttl >= config.DEFAULT_TTL_CHECK_INTERVAL:
@@ -246,7 +277,7 @@ def worker_loop(sess, stop_event, msg_queue):
         # 更新 token 剩余展示
         status(token_remaining=sess.token_remaining)
 
-        if _sleep(stop_event, min(http_poll, 1.0)):
+        if _sleep(stop_event, min(poll, 1.0)):
             break
 
     if sock:

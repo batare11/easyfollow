@@ -33,13 +33,15 @@ class App:
         self.sess = None
         self.worker = None
         self.chrome_proc = None
+        self._locked_port = None
         self._build_ui()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _build_ui(self):
         root = self.root
-        root.title(f"EasyFollow自动接单 v{config.APP_VERSION}")
-        root.geometry("760x520")
-        root.minsize(720, 480)
+        root.title(f"EasyFlow自动接单 v{config.APP_VERSION}")
+        root.geometry("660x580")
+        root.minsize(600, 450)
 
         style = ttk.Style()
         try:
@@ -92,12 +94,14 @@ class App:
         self.btn_start.grid(row=0, column=0, padx=3, pady=2)
         self.btn_stop = ttk.Button(ctl, text="停止", width=10, command=self.on_stop, state="disabled")
         self.btn_stop.grid(row=0, column=1, padx=3, pady=2)
-        ttk.Label(ctl, text="轮询(秒):").grid(row=0, column=2, padx=(10,2), pady=2)
-        self.poll_var = tk.StringVar(value=str(int(config.DEFAULT_POLL_INTERVAL)))
+        ttk.Label(ctl, text="轮询(ms):").grid(row=0, column=2, padx=(10,2), pady=2)
+        self.poll_var = tk.StringVar(value=str(int(config.DEFAULT_POLL_INTERVAL * 1000)))
         ttk.Entry(ctl, textvariable=self.poll_var, width=5).grid(row=0, column=3, padx=2, pady=2)
         ttk.Label(ctl, text="并发:").grid(row=0, column=4, padx=(10,2), pady=2)
-        self.concurrency_var = tk.StringVar(value="3")
+        self.concurrency_var = tk.StringVar(value="10")
         ttk.Entry(ctl, textvariable=self.concurrency_var, width=5).grid(row=0, column=5, padx=2, pady=2)
+        self.btn_apply = ttk.Button(ctl, text="应用", width=6, command=self.on_apply_params)
+        self.btn_apply.grid(row=0, column=6, padx=5, pady=2)
 
         status = ttk.Frame(run_frame)
         status.pack(fill="x", padx=6, pady=2)
@@ -105,39 +109,25 @@ class App:
         self.lbl_grab.grid(row=0, column=0, sticky="w", padx=4, pady=2)
         self.lbl_assign = ttk.Label(status, text="派单: 0", foreground="#2980b9")
         self.lbl_assign.grid(row=0, column=1, sticky="w", padx=4, pady=2)
+        self.lbl_total = ttk.Label(status, text="总单: --", foreground="#8e44ad")
+        self.lbl_total.grid(row=0, column=2, sticky="w", padx=4, pady=2)
         self.lbl_socket = ttk.Label(status, text="WS: --", foreground="#888")
-        self.lbl_socket.grid(row=0, column=2, sticky="w", padx=4, pady=2)
+        self.lbl_socket.grid(row=0, column=3, sticky="w", padx=4, pady=2)
         self.lbl_online_remain = ttk.Label(status, text="在线剩余: --", foreground="#27ae60")
-        self.lbl_online_remain.grid(row=0, column=3, sticky="w", padx=4, pady=2)
+        self.lbl_online_remain.grid(row=0, column=4, sticky="w", padx=4, pady=2)
         self.lbl_token_remain = ttk.Label(status, text="Token剩余: --", foreground="#c0392b")
-        self.lbl_token_remain.grid(row=0, column=4, sticky="w", padx=4, pady=2)
+        self.lbl_token_remain.grid(row=0, column=5, sticky="w", padx=4, pady=2)
 
-        orders = ttk.Frame(run_frame)
-        orders.pack(fill="both", expand=True, padx=6, pady=2)
-        cols = ("orderNo", "status", "usdtAmount", "expireTime", "settleRate")
-        self.tree = ttk.Treeview(orders, columns=cols, show="headings", height=4)
-        headers = {
-            "orderNo": ("订单号", 180),
-            "status": ("状态", 70),
-            "usdtAmount": ("USDT", 70),
-            "expireTime": ("过期时间", 130),
-            "settleRate": ("结算率", 70),
-        }
-        for c in cols:
-            self.tree.heading(c, text=headers[c][0])
-            self.tree.column(c, width=headers[c][1], anchor="center")
-        self.tree.pack(fill="both", expand=True, side="left")
-        sb = ttk.Scrollbar(orders, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
+        # 日志区域
+        pane = ttk.PanedWindow(run_frame, orient="vertical")
+        pane.pack(fill="both", expand=True, padx=6, pady=2)
 
-        # ========== 区域三：日志 ==========
-        log_frame = ttk.LabelFrame(root, text="日志")
-        log_frame.pack(fill="both", expand=True, padx=6, pady=2)
-        self.log_text = scrolledtext.ScrolledText(log_frame, height=5, wrap="word",
+        log_frame = ttk.Frame(pane)
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap="word",
                                                   font=("Consolas", 9))
         self.log_text.pack(fill="both", expand=True)
         self.log_text.configure(state="disabled")
+        pane.add(log_frame, weight=1)
 
         self._on_port_change()
         self._update_buttons()
@@ -152,15 +142,24 @@ class App:
     def _on_port_change(self, *a):
         port = self._port_value()
         if port:
+            # 释放旧端口锁
+            if self._locked_port and self._locked_port != port:
+                config.unlock_port(self._locked_port)
+                try:
+                    os.remove(config.session_file(self._locked_port))
+                except Exception:
+                    pass
+            config.lock_port(port)
+            self._locked_port = port
             self.sess = session.SessionData.load(port)
-            self.sess.login_url = self.url_var.get() or config.DEFAULT_LOGIN_URL
-            self.url_var.set(self.sess.login_url)
-            self.poll_var.set(str(int(self.sess.poll_interval or config.DEFAULT_POLL_INTERVAL)))
+            self.sess.login_url = config.DEFAULT_LOGIN_URL
+            self.poll_var.set(str(int((self.sess.poll_interval or config.DEFAULT_POLL_INTERVAL) * 1000)))
             self.concurrency_var.set(str(int(self.sess.concurrency or 3)))
             self.tokenkey_var.set(self.sess.token_key or "auto")
             self.bearer_var.set(self.sess.add_bearer)
             self.token_var.set(self.sess.token or "")
             self.lbl_token_remain.config(text=f"Token剩余: {_fmt(self.sess.token_remaining)}")
+            self.sess.save()
         else:
             self.sess = None
 
@@ -176,15 +175,15 @@ class App:
     def _sync_sess_from_ui(self):
         if not self.sess:
             return False
-        self.sess.login_url = self.url_var.get().strip() or config.DEFAULT_LOGIN_URL
+        self.sess.login_url = config.DEFAULT_LOGIN_URL
         try:
-            self.sess.poll_interval = max(0.5, float(self.poll_var.get()))
+            self.sess.poll_interval = max(0.5, float(self.poll_var.get()) / 1000)  # ms→秒
         except Exception:
             self.sess.poll_interval = config.DEFAULT_POLL_INTERVAL
         try:
             self.sess.concurrency = max(1, int(self.concurrency_var.get()))
         except Exception:
-            self.sess.concurrency = 3
+            self.sess.concurrency = 10
         self.sess.token_key = self.tokenkey_var.get().strip() or "auto"
         self.sess.add_bearer = bool(self.bearer_var.get())
         manual = self.token_var.get().strip()
@@ -215,17 +214,27 @@ class App:
         if not self.sess:
             self.sess = session.SessionData.load(port)
         self._sync_sess_from_ui()
-        url = self.url_var.get().strip() or config.DEFAULT_LOGIN_URL
-        try:
-            self._log(f"正在打开浏览器 | 端口 {port} | {url}")
-            self.chrome_proc = cdp.launch_chrome(port, url)
-            if not cdp.wait_for_devtools(port, 20):
-                self._log("警告: 调试端口未就绪，请确认 Chrome 已启动")
-            else:
-                self._log("浏览器已启动，请在浏览器中完成登录")
-        except Exception as e:
-            messagebox.showerror("错误", f"打开浏览器失败:\n{e}")
-            self._log(f"打开浏览器失败: {e}")
+        url = config.DEFAULT_LOGIN_URL
+        # 已运行则新建标签页；未运行则启动 Chrome
+        if cdp.wait_for_devtools(port, timeout=1):
+            try:
+                self._log(f"浏览器已运行（端口 {port}），打开新标签页...")
+                cdp.open_url_in_existing(port, url)
+                self._log("已打开登录页面")
+            except Exception as e:
+                self._log(f"打开标签失败: {e}，尝试重启浏览器...")
+                self.chrome_proc = cdp.launch_chrome(port, url)
+        else:
+            try:
+                self._log(f"正在启动浏览器 | 端口 {port}")
+                self.chrome_proc = cdp.launch_chrome(port, url)
+                if not cdp.wait_for_devtools(port, 20):
+                    self._log("警告: 调试端口未就绪，请确认 Chrome 已启动")
+                else:
+                    self._log("浏览器已启动，请在浏览器中完成登录")
+            except Exception as e:
+                messagebox.showerror("错误", f"打开浏览器失败:\n{e}")
+                self._log(f"打开浏览器失败: {e}")
 
     def on_start(self):
         port = self._port_value()
@@ -263,10 +272,47 @@ class App:
 
     def _on_worker_stopped(self):
         self._update_buttons()
-        self.lbl_socket.config(text="WS: --", foreground="#888")
-        self._log("任务已停止，订单表已清空")
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self._log("任务已停止")
+
+    def on_close(self):
+        # 停止 worker
+        if self.worker and self.worker.is_alive():
+            self._log("正在关闭...")
+            self.worker.stop()
+            self.worker.join(timeout=3)
+        # 杀掉关联的 Chrome 进程
+        if self.chrome_proc:
+            try:
+                import subprocess
+                subprocess.run(["taskkill", "/PID", str(self.chrome_proc.pid), "/T", "/F"],
+                               capture_output=True, creationflags=0x08000000 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0)
+            except Exception:
+                pass
+        # 释放端口锁 + 清理 session 文件
+        port = self._locked_port or self._port_value()
+        if port:
+            config.unlock_port(port)
+            try:
+                os.remove(config.session_file(port))
+            except Exception:
+                pass
+        self.root.destroy()
+
+    def on_apply_params(self):
+        if not self.sess:
+            return
+        try:
+            self.sess.poll_interval = max(0.5, float(self.poll_var.get()) / 1000)  # ms→秒
+        except Exception:
+            pass
+        try:
+            self.sess.concurrency = max(1, int(self.concurrency_var.get()))
+        except Exception:
+            self.sess.concurrency = 10
+        self.sess.save()
+        self._log(f"参数已保存 | 轮询 {self.sess.poll_interval}s | 并发 {self.sess.concurrency}")
+        if self.worker and self.worker.is_alive():
+            self.worker.msg_queue.put(("params_updated", None))
 
     def on_set_token(self):
         if not self.sess:
@@ -379,25 +425,13 @@ class App:
                 grab, assign = kw["order_stats"]
                 self.lbl_grab.config(text=f"抢单: {grab}")
                 self.lbl_assign.config(text=f"派单: {assign}")
-        elif kind == "orders":
-            self._update_orders(data)
+            if "home_total" in kw:
+                self.lbl_total.config(text=f"总单: {kw['home_total']}")
         elif kind == "expired":
             self._log("Token 已过期，任务终止，请重新登录")
             messagebox.showwarning("Token 过期", "Token 已过期(24小时)，请重新登录后启动")
         elif kind == "finished":
             self._log(f"任务结束: {data}")
-
-    def _update_orders(self, lst):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        for o in lst:
-            self.tree.insert("", "end", values=(
-                o.get("orderNo", ""),
-                o.get("status", ""),
-                o.get("usdtAmount", ""),
-                o.get("expireTime", ""),
-                o.get("settleRate", ""),
-            ))
 
 
 def run():

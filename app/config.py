@@ -1,7 +1,7 @@
 import os
 import sys
 
-APP_NAME = "EasyFollow"
+APP_NAME = "EasyFlow"
 APP_VERSION = "1.0.0"
 
 API_BASE = "https://core-api.easyflow.xin"
@@ -10,6 +10,7 @@ ENDPOINT_MY_ORDERS = "/app/platform/orderAssignment/myOrders"
 ENDPOINT_ACCEPT = "/app/platform/orderAssignment/accept"
 ENDPOINT_ONLINE = "/app/platform/trader/listenOrderSwitch"
 ENDPOINT_LOAD_TTL = "/app/platform/user/loadListenTTL"
+ENDPOINT_HOME_DATA = "/app/platform/home-page/homeData"
 
 DEFAULT_LOGIN_URL = "https://mix.easyflow.finance/#/pages/user/login"
 DOMAIN_HINT = "easyflow"
@@ -19,7 +20,7 @@ LANGUAGE = "zh-tw"
 TOKEN_VALID_SECONDS = 24 * 3600
 ONLINE_MAX_SECONDS = 3600
 
-DEFAULT_POLL_INTERVAL = 2.0
+DEFAULT_POLL_INTERVAL = 0.5
 BASE_PORT = 9222
 DEFAULT_TTL_CHECK_INTERVAL = 10.0
 DEFAULT_TOKEN_REFRESH_INTERVAL = 60.0
@@ -54,6 +55,14 @@ def session_file(port):
     return os.path.join(app_data_dir(), f"account_{port}.json")
 
 
+def orders_log_file(port):
+    return os.path.join(app_data_dir(), f"orders_{port}.log")
+
+
+def grab_log_file(port):
+    return os.path.join(app_data_dir(), f"grab_{port}.log")
+
+
 PORT_FILE = None
 
 
@@ -83,21 +92,40 @@ def save_last_port(port):
         pass
 
 
+def port_lock_file(port):
+    return os.path.join(app_data_dir(), f"port_{port}.lock")
+
+
 def _used_ports():
-    """扫描已保存的 session 文件，返回已被占用的端口集合。"""
+    """扫描 port_*.lock 文件，返回已锁定的端口集合。"""
     used = set()
     try:
         d = app_data_dir()
         for f in os.listdir(d):
-            if f.startswith("account_") and f.endswith(".json"):
+            if f.startswith("port_") and f.endswith(".lock"):
                 try:
-                    p = int(f[len("account_"):-len(".json")])
-                    used.add(p)
+                    used.add(int(f[len("port_"):-len(".lock")]))
                 except Exception:
                     pass
     except Exception:
         pass
     return used
+
+
+def lock_port(port):
+    try:
+        os.makedirs(app_data_dir(), exist_ok=True)
+        with open(port_lock_file(port), "w") as f:
+            f.write(str(port))
+    except Exception:
+        pass
+
+
+def unlock_port(port):
+    try:
+        os.remove(port_lock_file(port))
+    except Exception:
+        pass
 
 
 def recommended_port():

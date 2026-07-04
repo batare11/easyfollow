@@ -65,6 +65,18 @@ def wait_for_devtools(port, timeout=20):
     return False
 
 
+def open_url_in_existing(port, url):
+    """在已运行的 Chrome（端口 port）中打开新标签页。"""
+    ws_url = get_browser_ws_url(port)
+    if not ws_url:
+        raise RuntimeError(f"端口 {port} 的 Chrome 调试地址无响应")
+    client = CDPClient(ws_url)
+    try:
+        client.send("Target.createTarget", {"url": url})
+    finally:
+        client.close()
+
+
 class CDPClient:
     def __init__(self, ws_url, timeout=config.REQUEST_TIMEOUT):
         if not ws_url:
