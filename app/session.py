@@ -30,7 +30,7 @@ class SessionData:
         self.add_bearer = False
         self.token_source = ""
         self.account = ""
-        self.concurrency = 10
+        self.concurrency = 80
         self.grab_count = 0
         self.assign_count = 0
 

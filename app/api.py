@@ -1,4 +1,5 @@
 import requests
+import ssl
 
 from . import config
 
@@ -8,6 +9,7 @@ class ApiClient:
         self.token = token or ""
         self.add_bearer = add_bearer
         self.session = requests.Session()
+        self.session.trust_env = False
 
     def _auth(self):
         t = self.token
@@ -24,9 +26,39 @@ class ApiClient:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
         }
 
-    def _post(self, path, body=None):
+    def _post(self, path, body=None, timeout=None):
         url = config.API_BASE + path
-        resp = self.session.post(url, headers=self._headers(), json=body or {}, timeout=config.REQUEST_TIMEOUT)
+        read_to = timeout or config.REQUEST_TIMEOUT
+        try:
+            resp = self.session.post(url, headers=self._headers(), json=body or {}, timeout=(5, read_to))
+        except (ssl.SSLEOFError, ssl.SSLError):
+            self.session = requests.Session()
+            self.session.trust_env = False
+            try:
+                resp = self.session.post(url, headers=self._headers(), json=body or {}, timeout=(5, read_to))
+            except Exception as e:
+                return {"code": -1, "message": str(e)}
+        except Exception as e:
+            return {"code": -1, "message": str(e)}
+        try:
+            return resp.json()
+        except Exception:
+            return {"code": resp.status_code, "message": resp.text}
+
+    def _get(self, path, timeout=None):
+        url = config.API_BASE + path
+        read_to = timeout or config.REQUEST_TIMEOUT
+        try:
+            resp = self.session.get(url, headers=self._headers(), timeout=(5, read_to))
+        except (ssl.SSLEOFError, ssl.SSLError):
+            self.session = requests.Session()
+            self.session.trust_env = False
+            try:
+                resp = self.session.get(url, headers=self._headers(), timeout=(5, read_to))
+            except Exception as e:
+                return {"code": -1, "message": str(e)}
+        except Exception as e:
+            return {"code": -1, "message": str(e)}
         try:
             return resp.json()
         except Exception:
@@ -36,7 +68,7 @@ class ApiClient:
         return self._post(config.ENDPOINT_MY_ORDERS, {})
 
     def accept(self, order_no):
-        return self._post(config.ENDPOINT_ACCEPT, {"orderNo": order_no})
+        return self._post(config.ENDPOINT_ACCEPT, {"orderNo": order_no}, timeout=config.ACCEPT_TIMEOUT)
 
     def online(self):
         return self._post(config.ENDPOINT_ONLINE, {"lStatus": True})
@@ -46,3 +78,6 @@ class ApiClient:
 
     def home_data(self):
         return self._post(config.ENDPOINT_HOME_DATA, {})
+
+    def balance(self):
+        return self._get(config.ENDPOINT_BALANCE)

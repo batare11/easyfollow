@@ -52,7 +52,7 @@ class App:
         flow = ttk.Frame(root)
         flow.pack(fill="x", padx=8, pady=(4,2))
         ttk.Label(flow,
-                  text="方式一：打开浏览器 → 登录账号 → 启动（Token自动回填）    方式二：粘贴Token → 设置Token → 启动",
+                  text="打开浏览器 → 登录 → 刷新Token → 启动",
                   font=("Microsoft YaHei", 8), foreground="#888").pack(anchor="w")
 
         # ========== 区域一：Token 管理 ==========
@@ -94,14 +94,11 @@ class App:
         self.btn_start.grid(row=0, column=0, padx=3, pady=2)
         self.btn_stop = ttk.Button(ctl, text="停止", width=10, command=self.on_stop, state="disabled")
         self.btn_stop.grid(row=0, column=1, padx=3, pady=2)
-        ttk.Label(ctl, text="轮询(ms):").grid(row=0, column=2, padx=(10,2), pady=2)
-        self.poll_var = tk.StringVar(value=str(int(config.DEFAULT_POLL_INTERVAL * 1000)))
-        ttk.Entry(ctl, textvariable=self.poll_var, width=5).grid(row=0, column=3, padx=2, pady=2)
-        ttk.Label(ctl, text="并发:").grid(row=0, column=4, padx=(10,2), pady=2)
-        self.concurrency_var = tk.StringVar(value="10")
-        ttk.Entry(ctl, textvariable=self.concurrency_var, width=5).grid(row=0, column=5, padx=2, pady=2)
+        ttk.Label(ctl, text="并发:").grid(row=0, column=2, padx=(10,2), pady=2)
+        self.concurrency_var = tk.StringVar(value="80")
+        ttk.Entry(ctl, textvariable=self.concurrency_var, width=5).grid(row=0, column=3, padx=2, pady=2)
         self.btn_apply = ttk.Button(ctl, text="应用", width=6, command=self.on_apply_params)
-        self.btn_apply.grid(row=0, column=6, padx=5, pady=2)
+        self.btn_apply.grid(row=0, column=4, padx=5, pady=2)
 
         status = ttk.Frame(run_frame)
         status.pack(fill="x", padx=6, pady=2)
@@ -127,6 +124,7 @@ class App:
                                                   font=("Consolas", 9))
         self.log_text.pack(fill="both", expand=True)
         self.log_text.configure(state="disabled")
+        self.log_text.tag_config("red", foreground="#e74c3c")
         pane.add(log_frame, weight=1)
 
         self._on_port_change()
@@ -134,8 +132,30 @@ class App:
 
     # ---------- helpers ----------
     def _log(self, msg):
+        if not msg.startswith("["):
+            now = time.time()
+            ts = time.strftime("%H:%M:%S", time.localtime(now))
+            ms = int((now % 1) * 1000)
+            msg = f"[{ts}.{ms:03d}] {msg}"
         self.log_text.configure(state="normal")
         self.log_text.insert("end", msg + "\n")
+        line_count = int(self.log_text.index("end-1c").split(".")[0])
+        if line_count > 500:
+            self.log_text.delete("1.0", f"{line_count - 500}.0")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
+
+    def _log_red(self, msg):
+        if not msg.startswith("["):
+            now = time.time()
+            ts = time.strftime("%H:%M:%S", time.localtime(now))
+            ms = int((now % 1) * 1000)
+            msg = f"[{ts}.{ms:03d}] {msg}"
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", msg + "\n", "red")
+        line_count = int(self.log_text.index("end-1c").split(".")[0])
+        if line_count > 500:
+            self.log_text.delete("1.0", f"{line_count - 500}.0")
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
@@ -153,7 +173,6 @@ class App:
             self._locked_port = port
             self.sess = session.SessionData.load(port)
             self.sess.login_url = config.DEFAULT_LOGIN_URL
-            self.poll_var.set(str(int((self.sess.poll_interval or config.DEFAULT_POLL_INTERVAL) * 1000)))
             self.concurrency_var.set(str(int(self.sess.concurrency or 3)))
             self.tokenkey_var.set(self.sess.token_key or "auto")
             self.bearer_var.set(self.sess.add_bearer)
@@ -176,10 +195,6 @@ class App:
         if not self.sess:
             return False
         self.sess.login_url = config.DEFAULT_LOGIN_URL
-        try:
-            self.sess.poll_interval = max(0.5, float(self.poll_var.get()) / 1000)  # ms→秒
-        except Exception:
-            self.sess.poll_interval = config.DEFAULT_POLL_INTERVAL
         try:
             self.sess.concurrency = max(1, int(self.concurrency_var.get()))
         except Exception:
@@ -275,42 +290,38 @@ class App:
         self._log("任务已停止")
 
     def on_close(self):
-        # 停止 worker
-        if self.worker and self.worker.is_alive():
-            self._log("正在关闭...")
-            self.worker.stop()
-            self.worker.join(timeout=3)
-        # 杀掉关联的 Chrome 进程
-        if self.chrome_proc:
-            try:
-                import subprocess
-                subprocess.run(["taskkill", "/PID", str(self.chrome_proc.pid), "/T", "/F"],
-                               capture_output=True, creationflags=0x08000000 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0)
-            except Exception:
-                pass
-        # 释放端口锁 + 清理 session 文件
-        port = self._locked_port or self._port_value()
-        if port:
-            config.unlock_port(port)
-            try:
-                os.remove(config.session_file(port))
-            except Exception:
-                pass
-        self.root.destroy()
+        try:
+            if self.worker and self.worker.is_alive():
+                self.worker.stop()
+                self.worker.join(timeout=2)
+            if self.chrome_proc:
+                try:
+                    import subprocess
+                    subprocess.run(["taskkill", "/PID", str(self.chrome_proc.pid), "/T", "/F"],
+                                   capture_output=True, creationflags=0x08000000 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0)
+                except Exception:
+                    pass
+            port = self._locked_port or self._port_value()
+            if port:
+                config.unlock_port(port)
+                try:
+                    os.remove(config.session_file(port))
+                except Exception:
+                    pass
+                import shutil
+                shutil.rmtree(config.chrome_user_dir(port), ignore_errors=True)
+        finally:
+            os._exit(0)
 
     def on_apply_params(self):
         if not self.sess:
             return
         try:
-            self.sess.poll_interval = max(0.5, float(self.poll_var.get()) / 1000)  # ms→秒
-        except Exception:
-            pass
-        try:
             self.sess.concurrency = max(1, int(self.concurrency_var.get()))
         except Exception:
             self.sess.concurrency = 10
         self.sess.save()
-        self._log(f"参数已保存 | 轮询 {self.sess.poll_interval}s | 并发 {self.sess.concurrency}")
+        self._log(f"参数已保存 | 并发 {self.sess.concurrency}")
         if self.worker and self.worker.is_alive():
             self.worker.msg_queue.put(("params_updated", None))
 
@@ -347,7 +358,7 @@ class App:
                 key, value, source = cdp.read_token(
                     port, token_key=self.sess.token_key, url=self.sess.login_url)
                 if not value:
-                    self._log("刷新失败: 未在浏览器中检测到 Token，请先在该端口浏览器登录")
+                    self._log(f"刷新失败: {source}")
                     return
                 self.token_var.set(value)
                 self.sess.token = value
@@ -402,6 +413,8 @@ class App:
     def _handle_msg(self, kind, data):
         if kind == "log":
             self._log(data)
+        elif kind == "red_log":
+            self._log_red(data)
         elif kind == "status":
             kw = data
             if "token_found" in kw:

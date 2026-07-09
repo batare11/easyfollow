@@ -220,21 +220,48 @@ def _score(c):
 
 
 def read_token(port, token_key="auto", url=None):
-    target = ensure_domain_target(port, url)
+    pages = get_page_targets(port)
+    if not pages:
+        return None, None, f"端口 {port} 无浏览器页面，确认Chrome以调试模式启动(--remote-debugging-port={port})"
+
+    target = None
+    for t in pages:
+        if config.DOMAIN_HINT in t.get("url", ""):
+            target = t
+            break
     if not target:
-        return None, "未找到浏览器页面，请先打开浏览器", None
+        ws_url = get_browser_ws_url(port)
+        if ws_url:
+            try:
+                client = CDPClient(ws_url)
+                try:
+                    client.send("Target.createTarget", {"url": url or config.DEFAULT_LOGIN_URL})
+                finally:
+                    client.close()
+                time.sleep(1.5)
+            except Exception:
+                pass
+        pages = get_page_targets(port)
+        for t in pages:
+            if config.DOMAIN_HINT in t.get("url", ""):
+                target = t
+                break
+
+    if not target:
+        return None, None, f"未找到 easyflow 页面，当前页签: {[t.get('url','')[:60] for t in pages]}"
+
     ws_url = target.get("webSocketDebuggerUrl")
     if not ws_url:
-        return None, "页面缺少调试地址", None
+        return None, None, "页面缺少调试地址"
     try:
         client = CDPClient(ws_url)
     except Exception as e:
-        return None, f"连接调试端口失败: {e}", None
+        return None, None, f"连接调试端口失败: {e}"
     try:
         ls = client.get_local_storage()
         cookies = client.get_cookies()
     except Exception as e:
-        return None, f"读取存储失败: {e}", None
+        return None, None, f"读取存储失败: {e}"
     finally:
         client.close()
 
@@ -253,7 +280,7 @@ def read_token(port, token_key="auto", url=None):
             candidates.append((n, v, "cookie"))
 
     if not candidates:
-        return None, "未检测到 token，请在浏览器中完成登录", None
+        return None, None, f"localStorage({len(ls)}键)和cookie({len(cookies)}个)均未匹配到token"
 
     candidates.sort(key=_score, reverse=True)
     best = candidates[0]

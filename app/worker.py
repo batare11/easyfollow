@@ -2,9 +2,8 @@ import queue
 import threading
 import time
 import traceback
-import json
-from concurrent.futures import ThreadPoolExecutor
 
+from .accept_engine import AcceptEngine
 from . import config, cdp, api
 from .socket_client import SocketOrderClient
 
@@ -34,7 +33,10 @@ def _fmt(seconds):
 
 def worker_loop(sess, stop_event, msg_queue):
     def log(msg):
-        msg_queue.put(("log", f"[{time.strftime('%H:%M:%S')}] {msg}"))
+        now = time.time()
+        ts = time.strftime("%H:%M:%S", time.localtime(now))
+        ms = int((now % 1) * 1000)
+        msg_queue.put(("log", f"[{ts}.{ms:03d}] {msg}"))
 
     def status(**kw):
         msg_queue.put(("status", kw))
@@ -42,9 +44,10 @@ def worker_loop(sess, stop_event, msg_queue):
     def orders(list_data):
         msg_queue.put(("orders", list_data))
 
-    poll = max(0.5, float(getattr(sess, "poll_interval", config.DEFAULT_POLL_INTERVAL) or config.DEFAULT_POLL_INTERVAL))
-    conc = max(1, int(getattr(sess, "concurrency", 10) or 10))
-    log(f"任务已启动 | 端口 {sess.port} | 轮询 {poll}s | 并发 {conc}")
+    # HTTP兜底轮询间隔（派单不着急，固定1.5s）
+    poll = config.DEFAULT_POLL_INTERVAL
+    conc = max(1, int(getattr(sess, "concurrency", 80) or 80))
+    log(f"任务已启动 | 端口 {sess.port} | 并发 {conc}")
 
     # 阶段一：登录检测
     if sess.token_expired or not sess.token:
@@ -101,94 +104,144 @@ def worker_loop(sess, stop_event, msg_queue):
     except Exception as e:
         log(f"初始化在线检查异常: {e}")
 
-    # 已接单去重集合（进程内）
-    accepted = set()
-    accepted_lock = threading.Lock()
-    stats = {"grab": int(getattr(sess, "grab_count", 0) or 0),
-             "assign": int(getattr(sess, "assign_count", 0) or 0)}
+    stats = {"grab": 0, "assign": 0}
+    sess.grab_count = 0
+    sess.assign_count = 0
+    try:
+        sess.save()
+    except Exception:
+        pass
+    _stats_lock = threading.Lock()
+    _sess_dirty = [False]
+    _seen_orders = set()
     status(order_stats=(stats["grab"], stats["assign"]))
-    # 持久线程池，避免重复创建开销
-    accept_pool = ThreadPoolExecutor(max_workers=conc, thread_name_prefix="accept")
 
-    def do_accept(order_obj, source):
-        """在 accept_pool 中异步执行接单。"""
-        order_no = (order_obj or {}).get("orderNo", "")
-        if not order_no:
-            return
-        with accepted_lock:
-            if order_no in accepted:
-                return
-            accepted.add(order_no)
-        st = (order_obj or {}).get("status") or ""
-        kind = "派单" if st == "assigned" else "抢单"
-        def _run():
-            try:
-                ar = client.accept(order_no)
-                ok = ar.get("code") == 1000
-                if ok:
-                    with accepted_lock:
-                        if st == "assigned":
-                            stats["assign"] += 1
-                        else:
-                            stats["grab"] += 1
-                    sess.grab_count = stats["grab"]
-                    sess.assign_count = stats["assign"]
-                    sess.save()
-                    status(order_stats=(stats["grab"], stats["assign"]))
-                    log(f"[{source}][{kind}] 接单成功: {order_no} | USDT {order_obj.get('usdtAmount')} | 率 {order_obj.get('settleRate')}")
-                else:
-                    log(f"[{source}][{kind}] 接单失败: {order_no} | {ar.get('message')}")
-            except Exception as e:
-                log(f"[{source}][{kind}] 接单异常: {order_no} | {e}")
-        accept_pool.submit(_run)
+    # aiohttp 异步接单引擎（单线程事件循环，并发上限由 semaphore 控制）
+    accept_engine = AcceptEngine(
+        token=sess.token,
+        add_bearer=sess.add_bearer,
+        concurrency=conc,
+        on_error=lambda msg: log(msg),
+    )
+    accept_engine.start()
+
+    def _on_accept_ok(_no, _obj, _src, elapsed):
+        is_assigned = (_obj or {}).get("status") == "assigned"
+        with _stats_lock:
+            if is_assigned:
+                stats["assign"] += 1
+            else:
+                stats["grab"] += 1
+        if not _sess_dirty[0]:
+            _sess_dirty[0] = True
+        status(order_stats=(stats["grab"], stats["assign"]))
+        if _src == "Socket":
+            kind = "派单" if is_assigned else "抢单"
+            log(f"[{_src}][{kind}] ✅ {_no} | "
+                f"USDT {_obj.get('usdtAmount')} | 率 {_obj.get('settleRate')} | {elapsed}ms")
+
+    def _on_accept_fail(_no, _obj, _src, msg, elapsed):
+        if _src == "Socket":
+            kind = "派单" if (_obj or {}).get("status") == "assigned" else "抢单"
+            log(f"[{_src}][{kind}] ❌ {_no} | {msg} | {elapsed}ms")
 
     def accept_list(lst, source):
         if not lst:
+            if source == "Socket":
+                log("[Socket] 收到 0 个")
             return
-        _save_orders(lst)
+        tasks = []
         for o in lst:
-            do_accept(o, source)
-        log(f"[{source}] 收到 {len(lst)} 个 → 已提交")
+            order_no = (o or {}).get("orderNo", "")
+            if not order_no:
+                continue
+            if order_no in _seen_orders:
+                continue
+            _seen_orders.add(order_no)
+            if len(_seen_orders) > 10000:
+                _seen_orders.clear()
+            tasks.append(o)
 
-    def _save_orders(lst):
-        ts = time.strftime("%Y-%m-%d %H:%M:%S")
-        for o in lst:
-            line = json.dumps({"ts": ts, "order": o}, ensure_ascii=False) + "\n"
-            try:
-                with open(config.orders_log_file(sess.port), "a", encoding="utf-8") as f:
-                    f.write(line)
-                st = (o or {}).get("status", "")
-                if st != "assigned":
-                    with open(config.grab_log_file(sess.port), "a", encoding="utf-8") as f:
-                        f.write(line)
-            except Exception:
-                pass
+        if tasks:
+            accept_engine.enqueue_batch(tasks, source, _on_accept_ok, _on_accept_fail)
+        if source == "Socket":
+            log(f"[{source}] ✅ 收到 {len(lst)} 个 → 已提交")
 
-    # Socket 实时通道（主）
-    sock = None
+    # Socket 实时通道（双连接冗余，断一条另一条继续收单）
+    sock1 = None
+    sock2 = None
+    _sock_state = {"connected": False, "count": 0}
+    _force_reonline = False
+    _zero_log_state = {"ts": 0.0}
+
     def _on_order(lst):
         if lst:
             accept_list(lst, "Socket")
-    try:
-        sock = SocketOrderClient(
+        else:
+            now = time.time()
+            if now - _zero_log_state["ts"] >= 3:
+                _zero_log_state["ts"] = now
+                log("[Socket] 收到 0 个")
+
+    def _on_sock_status(**kw):
+        if "socket_connected" in kw:
+            if kw["socket_connected"]:
+                _sock_state["count"] += 1
+            else:
+                _sock_state["count"] = max(0, _sock_state["count"] - 1)
+            was_connected = _sock_state["connected"]
+            _sock_state["connected"] = _sock_state["count"] > 0
+            if was_connected and not _sock_state["connected"]:
+                nonlocal _force_reonline
+                _force_reonline = True
+        status(**kw)
+
+    def _make_socket(offset=0):
+        return SocketOrderClient(
             token=sess.token,
             add_bearer=sess.add_bearer,
-            poll_interval=sess.poll_interval,
             port=sess.port,
             on_order=_on_order,
-            on_status=(lambda **kw: status(**kw)),
+            on_status=_on_sock_status,
             on_log=(lambda m: log(m)),
+            poll_offset=offset,
         )
-        sock.connect_async()
+
+    try:
+        sock1 = _make_socket()
+        sock1.connect_async()
+        sock2 = _make_socket(offset=0.5)
+        sock2.connect_async()
     except Exception as e:
         log(f"Socket 初始化异常: {e}")
 
-    # HTTP 兜底轮询间隔放宽（Socket 已是主通道）
+    # HTTP兜底轮询独立线程（不阻塞主循环）
+    def _http_poller():
+        while not stop_event.is_set():
+            http_interval = poll / 4 if not _sock_state["connected"] else poll
+            http_interval = max(http_interval, 0.2)
+            try:
+                resp = client.my_orders()
+                code = resp.get("code")
+                if code == 1000:
+                    data = resp.get("data") or {}
+                    lst = data.get("list") or []
+                    if lst:
+                        accept_list(lst, "HTTP")
+                elif code not in (-1,):
+                    log(f"查询订单失败: code={code} msg={resp.get('message')}")
+            except Exception as e:
+                log(f"查询订单异常: {e}")
+            _sleep(stop_event, http_interval)
 
-    last_poll = 0.0
+    _http_thread = threading.Thread(target=_http_poller, daemon=True)
+    _http_thread.start()
+
     last_ttl = 0.0
+    last_reonline = 0.0
     last_token_refresh = 0.0
     last_home = 0.0
+    last_balance = 0.0
 
     while not stop_event.is_set():
         now = time.time()
@@ -212,36 +265,20 @@ def worker_loop(sess, stop_event, msg_queue):
                     sess.token = value
                     sess.save()
                     client.token = value
+                    accept_engine.token = value
                     log("Token 已从浏览器刷新")
-                    if sock:
-                        try:
-                            sock.stop()
-                            sock.token = value
-                            sock.connect_async()
-                        except Exception:
-                            pass
+                    for s in (sock1, sock2):
+                        if s:
+                            try:
+                                s.stop()
+                                s.token = value
+                                s.connect_async()
+                            except Exception:
+                                pass
                 if value:
                     status(token_found=True)
             except Exception:
                 pass
-
-        # HTTP 兜底查询订单（与 Socket 同频）
-        if now - last_poll >= poll:
-            last_poll = now
-            try:
-                resp = client.my_orders()
-                code = resp.get("code")
-                if code == 1000:
-                    data = resp.get("data") or {}
-                    lst = data.get("list") or []
-                    if lst:
-                        accept_list(lst, "HTTP")
-                    else:
-                        log("[HTTP] 收到 0 个")
-                else:
-                    log(f"查询订单失败: code={code} msg={resp.get('message')}")
-            except Exception as e:
-                log(f"查询订单异常: {e}")
 
         # 总单查询
         if now - last_home >= 5:
@@ -254,23 +291,56 @@ def worker_loop(sess, stop_event, msg_queue):
             except Exception:
                 pass
 
+        # 余额查询
+        if now - last_balance >= config.BALANCE_CHECK_INTERVAL:
+            last_balance = now
+            try:
+                br = client.balance()
+                if br.get("code") == 1000:
+                    bd = br.get("data") or {}
+                    bal = float(bd.get("usdtBalance", 0) or 0)
+                    if bal < config.BALANCE_WARN_THRESHOLD:
+                        msg_queue.put(("red_log",
+                            f"余额不足 USDT {bal:.4f}，低于 {config.BALANCE_WARN_THRESHOLD}，请及时充值"))
+            except Exception:
+                pass
+
         # 在线保持
-        if now - last_ttl >= config.DEFAULT_TTL_CHECK_INTERVAL:
+        if _force_reonline or (now - last_ttl >= config.DEFAULT_TTL_CHECK_INTERVAL):
+            _force_reonline = False
             last_ttl = now
+            # 批量落盘统计计数（避免每次接单都写文件）
+            if _sess_dirty[0]:
+                _sess_dirty[0] = False
+                sess.grab_count = stats["grab"]
+                sess.assign_count = stats["assign"]
+                try:
+                    sess.save()
+                except Exception:
+                    pass
             try:
                 tr = client.load_ttl()
+                need_reonline = False
                 if tr.get("code") == 1000:
                     remain = tr.get("data")
                     status(online_remaining=remain, online_active=True)
                     if remain is None or (isinstance(remain, (int, float)) and remain <= config.RE_ONLINE_THRESHOLD):
+                        need_reonline = True
+                else:
+                    log(f"查询在线剩余失败: {tr.get('message')}")
+                    remain = None
+                    need_reonline = True
+                if need_reonline:
+                    is_low = isinstance(remain, (int, float)) and remain <= 10
+                    cooldown = 30 if is_low else 300
+                    if now - last_reonline >= cooldown:
+                        last_reonline = now
                         ar = client.online()
                         if ar.get("code") == 1000:
                             log("在线倒计时结束，已自动重新上线")
                             status(online_remaining=config.ONLINE_MAX_SECONDS, online_active=True)
                         else:
                             log(f"自动上线失败: {ar.get('message')}")
-                else:
-                    log(f"查询在线剩余失败: {tr.get('message')}")
             except Exception as e:
                 log(f"查询在线剩余异常: {e}")
 
@@ -280,9 +350,21 @@ def worker_loop(sess, stop_event, msg_queue):
         if _sleep(stop_event, min(poll, 1.0)):
             break
 
-    if sock:
+    for s in (sock1, sock2):
+        if s:
+            try:
+                s.stop()
+            except Exception:
+                pass
+    try:
+        accept_engine.stop()
+    except Exception:
+        pass
+    if _sess_dirty[0]:
+        sess.grab_count = stats["grab"]
+        sess.assign_count = stats["assign"]
         try:
-            sock.stop()
+            sess.save()
         except Exception:
             pass
     log("任务已停止")

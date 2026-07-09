@@ -1,0 +1,93 @@
+正在启动浏览器 | 端口 9222
+浏览器已启动，请在浏览器中完成登录
+已从端口 9222 浏览器刷新 Token（来源 localStorage）
+Token 已设置，可点击启动
+[04:33:40] 任务已启动 | 端口 9222 | 并发 100
+[04:33:43] 在线剩余 2719s，无需重复上线
+[04:33:43] Socket 已连接 /orderService
+[05:18:03] 在线倒计时结束，已自动重新上线
+[05:19:07] 在线倒计时结束，已自动重新上线
+[05:25:36] Socket 已断开
+[05:25:36] Socket 已连接 /orderService
+[05:58:09] Socket 已断开
+[05:58:10] Socket 已连接 /orderService
+[06:09:39] Socket 已断开
+[06:09:41] Socket 已连接 /orderService
+[06:09:52] Socket 已断开
+[06:09:52] Socket 连接异常: Client is not in a disconnected state
+[06:09:53] Socket 已连接 /orderService
+[06:09:53] Socket 已断开
+[06:09:53] Socket 已连接 /orderService
+[06:14:59] Socket 已断开
+[06:15:01] Socket 已连接 /orderService
+[06:15:01] Socket 已断开
+[06:15:02] Socket 已连接 /orderService
+[06:18:15] 在线倒计时结束，已自动重新上线
+[06:19:17] 在线倒计时结束，已自动重新上线
+[06:26:43] Socket 已断开
+[06:26:44] Socket 已连接 /orderService
+[06:33:00] Socket 已断开
+[06:33:03] Socket 已连接 /orderService
+[06:36:21] Socket 已断开
+[06:36:22] Socket 已连接 /orderService
+[06:40:32] Socket 已断开
+[06:40:33] Socket 已连接 /orderService
+[06:42:17] Socket 已断开
+[06:42:18] Socket 已连接 /orderService
+[07:13:44] Socket 已断开
+[07:13:47] Socket 已连接 /orderService
+[07:18:25] 在线倒计时结束，已自动重新上线
+[07:19:17] 在线倒计时结束，已自动重新上线
+[08:01:20] Socket 已断开
+[08:01:20] Socket 连接异常: Client is not in a disconnected state
+[08:01:22] Socket 已连接 /orderService
+[08:18:18] 在线倒计时结束，已自动重新上线
+[08:19:22] 在线倒计时结束，已自动重新上线
+[08:23:29] Socket 已断开
+[08:23:31] Socket 已连接 /orderService
+[08:45:38] Socket 已断开
+[08:45:40] Socket 已连接 /orderService
+[08:53:59] Socket 已断开
+[08:54:00] Socket 已连接 /orderService
+[09:18:25] 在线倒计时结束，已自动重新上线
+[09:19:28] 在线倒计时结束，已自动重新上线
+[09:27:39] Socket 已断开
+[09:27:41] Socket 已连接 /orderService
+[09:31:17] Socket 已断开
+[09:31:18] Socket 已连接 /orderService
+[09:39:39] Socket 已断开
+[09:39:40] Socket 已连接 /orderService
+[09:44:40] Socket 已断开
+[09:44:42] Socket 已连接 /orderService
+[09:44:42] Socket 已断开
+[09:44:43] Socket 已连接 /orderService
+[09:44:43] Socket 已断开
+[09:44:44] Socket 已连接 /orderService
+[09:53:21] Socket 已断开
+[09:53:22] Socket 已连接 /orderService
+[09:53:22] Socket 已连接 /orderService
+[09:53:22] Socket 已断开
+[09:53:22] Socket 已连接 /orderService
+[09:54:47] Socket 已断开
+[09:54:47] Socket 已连接 /orderService
+[10:00:25] Socket 已断开
+[10:00:26] Socket 已连接 /orderService
+[10:00:27] Socket 已断开
+[10:00:27] Socket 已连接 /orderService
+正在停止任务...
+[10:00:48] Socket 已断开
+[10:00:48] 任务已停止
+任务结束: stopped
+任务已停止
+正在启动浏览器 | 端口 9222
+浏览器已启动，请在浏览器中完成登录
+已从端口 9222 浏览器刷新 Token（来源 localStorage）
+Token 已设置，可点击启动
+[10:02:08] 任务已启动 | 端口 9222 | 并发 100
+[10:02:10] 在线剩余 1038s，无需重复上线
+[10:02:11] Socket 已连接 /orderService
+[10:18:28] 在线倒计时结束，已自动重新上线
+[10:19:31] 在线倒计时结束，已自动重新上线
+[10:49:24] Socket 已断开
+[10:49:25] Socket 已连接 /orderService
+

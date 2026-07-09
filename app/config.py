@@ -8,9 +8,11 @@ API_BASE = "https://core-api.easyflow.xin"
 
 ENDPOINT_MY_ORDERS = "/app/platform/orderAssignment/myOrders"
 ENDPOINT_ACCEPT = "/app/platform/orderAssignment/accept"
+ENDPOINT_GRAB = "/app/platform/orders/grab"
 ENDPOINT_ONLINE = "/app/platform/trader/listenOrderSwitch"
 ENDPOINT_LOAD_TTL = "/app/platform/user/loadListenTTL"
 ENDPOINT_HOME_DATA = "/app/platform/home-page/homeData"
+ENDPOINT_BALANCE = "/app/platform/user/balance"
 
 DEFAULT_LOGIN_URL = "https://mix.easyflow.finance/#/pages/user/login"
 DOMAIN_HINT = "easyflow"
@@ -20,13 +22,17 @@ LANGUAGE = "zh-tw"
 TOKEN_VALID_SECONDS = 24 * 3600
 ONLINE_MAX_SECONDS = 3600
 
-DEFAULT_POLL_INTERVAL = 0.5
+DEFAULT_POLL_INTERVAL = 1.0
+SOCKET_EMIT_INTERVAL = 1.0
 BASE_PORT = 9222
 DEFAULT_TTL_CHECK_INTERVAL = 10.0
+BALANCE_CHECK_INTERVAL = 30.0
+BALANCE_WARN_THRESHOLD = 500
 DEFAULT_TOKEN_REFRESH_INTERVAL = 60.0
 RE_ONLINE_THRESHOLD = 60
 
 REQUEST_TIMEOUT = 15
+ACCEPT_TIMEOUT = 1
 
 CHROME_PATH_CANDIDATES = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -61,6 +67,14 @@ def orders_log_file(port):
 
 def grab_log_file(port):
     return os.path.join(app_data_dir(), f"grab_{port}.log")
+
+
+def app_log_file(port):
+    return os.path.join(app_data_dir(), f"app_{port}.log")
+
+
+def accept_log_file(port):
+    return os.path.join(app_data_dir(), f"accept_{port}.log")
 
 
 PORT_FILE = None
@@ -129,15 +143,41 @@ def unlock_port(port):
 
 
 def recommended_port():
-    """单开返回基础端口；多开依次递增（按已有 session 数）。"""
+    """单开返回基础端口；多开依次递增。自动清理僵尸锁文件。"""
+    import urllib.request
     used = _used_ports()
+    for port in sorted(used):
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=1)
+        except Exception:
+            unlock_port(port)
+            used.discard(port)
     port = BASE_PORT
     while port in used:
         port += 1
     return port
 
 
+def _chrome_from_registry():
+    try:
+        import winreg
+        for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                with winreg.OpenKey(root, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe") as key:
+                    path, _ = winreg.QueryValueEx(key, "")
+                    if path and os.path.isfile(path):
+                        return path
+            except OSError:
+                pass
+    except Exception:
+        pass
+    return None
+
+
 def find_chrome():
+    reg = _chrome_from_registry()
+    if reg:
+        return reg
     for p in CHROME_PATH_CANDIDATES:
         if p and os.path.isfile(p):
             return p

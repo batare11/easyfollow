@@ -1,0 +1,239 @@
+正在启动浏览器 | 端口 9222
+浏览器已启动，请在浏览器中完成登录
+已从端口 9222 浏览器刷新 Token（来源 localStorage）
+Token 已设置，可点击启动
+[04:33:40] 任务已启动 | 端口 9222 | 并发 100
+[04:33:43] 在线剩余 2719s，无需重复上线
+[04:33:43] Socket 已连接 /orderService
+[05:18:03] 在线倒计时结束，已自动重新上线
+[05:19:07] 在线倒计时结束，已自动重新上线
+[05:25:36] Socket 已断开
+[05:25:36] Socket 已连接 /orderService
+[05:58:09] Socket 已断开
+[05:58:10] Socket 已连接 /orderService
+[06:09:39] Socket 已断开
+[06:09:41] Socket 已连接 /orderService
+[06:09:52] Socket 已断开
+[06:09:52] Socket 连接异常: Client is not in a disconnected state
+[06:09:53] Socket 已连接 /orderService
+[06:09:53] Socket 已断开
+[06:09:53] Socket 已连接 /orderService
+[06:14:59] Socket 已断开
+[06:15:01] Socket 已连接 /orderService
+[06:15:01] Socket 已断开
+[06:15:02] Socket 已连接 /orderService
+[06:18:15] 在线倒计时结束，已自动重新上线
+[06:19:17] 在线倒计时结束，已自动重新上线
+[06:26:43] Socket 已断开
+[06:26:44] Socket 已连接 /orderService
+[06:33:00] Socket 已断开
+[06:33:03] Socket 已连接 /orderService
+[06:36:21] Socket 已断开
+[06:36:22] Socket 已连接 /orderService
+[06:40:32] Socket 已断开
+[06:40:33] Socket 已连接 /orderService
+[06:42:17] Socket 已断开
+[06:42:18] Socket 已连接 /orderService
+[07:13:44] Socket 已断开
+[07:13:47] Socket 已连接 /orderService
+[07:18:25] 在线倒计时结束，已自动重新上线
+[07:19:17] 在线倒计时结束，已自动重新上线
+[08:01:20] Socket 已断开
+[08:01:20] Socket 连接异常: Client is not in a disconnected state
+[08:01:22] Socket 已连接 /orderService
+[08:18:18] 在线倒计时结束，已自动重新上线
+[08:19:22] 在线倒计时结束，已自动重新上线
+[08:23:29] Socket 已断开
+[08:23:31] Socket 已连接 /orderService
+[08:45:38] Socket 已断开
+[08:45:40] Socket 已连接 /orderService
+[08:53:59] Socket 已断开
+[08:54:00] Socket 已连接 /orderService
+[09:18:25] 在线倒计时结束，已自动重新上线
+[09:19:28] 在线倒计时结束，已自动重新上线
+[09:27:39] Socket 已断开
+[09:27:41] Socket 已连接 /orderService
+[09:31:17] Socket 已断开
+[09:31:18] Socket 已连接 /orderService
+[09:39:39] Socket 已断开
+[09:39:40] Socket 已连接 /orderService
+[09:44:40] Socket 已断开
+[09:44:42] Socket 已连接 /orderService
+[09:44:42] Socket 已断开
+[09:44:43] Socket 已连接 /orderService
+[09:44:43] Socket 已断开
+[09:44:44] Socket 已连接 /orderService
+[09:53:21] Socket 已断开
+[09:53:22] Socket 已连接 /orderService
+[09:53:22] Socket 已连接 /orderService
+[09:53:22] Socket 已断开
+[09:53:22] Socket 已连接 /orderService
+[09:54:47] Socket 已断开
+[09:54:47] Socket 已连接 /orderService
+[10:00:25] Socket 已断开
+[10:00:26] Socket 已连接 /orderService
+[10:00:27] Socket 已断开
+[10:00:27] Socket 已连接 /orderService
+正在停止任务...
+[10:00:48] Socket 已断开
+[10:00:48] 任务已停止
+任务结束: stopped
+任务已停止
+正在启动浏览器 | 端口 9222
+浏览器已启动，请在浏览器中完成登录
+已从端口 9222 浏览器刷新 Token（来源 localStorage）
+Token 已设置，可点击启动
+[10:02:08] 任务已启动 | 端口 9222 | 并发 100
+[10:02:10] 在线剩余 1038s，无需重复上线
+[10:02:11] Socket 已连接 /orderService
+[10:18:28] 在线倒计时结束，已自动重新上线
+[10:19:31] 在线倒计时结束，已自动重新上线
+[10:49:24] Socket 已断开
+[10:49:25] Socket 已连接 /orderService
+[11:13:27] Socket 已断开
+[11:13:28] Socket 已连接 /orderService
+[11:18:05] Socket 已断开
+[11:18:06] Socket 已连接 /orderService
+[11:18:37] 在线倒计时结束，已自动重新上线
+[11:19:24] Socket 已断开
+[11:19:25] Socket 已连接 /orderService
+[11:19:33] 在线倒计时结束，已自动重新上线
+[11:35:08] Socket 已断开
+[11:35:09] Socket 已连接 /orderService
+[12:00:36] Socket 已断开
+[12:00:36] Socket 已连接 /orderService
+[12:01:40] Socket 已断开
+[12:01:41] Socket 已连接 /orderService
+[12:05:06] Socket 已断开
+[12:05:07] Socket 已连接 /orderService
+[12:05:07] Socket 已连接 /orderService
+[12:07:48] Socket 已断开
+[12:07:49] Socket 已连接 /orderService
+[12:18:34] 在线倒计时结束，已自动重新上线
+[12:19:38] 在线倒计时结束，已自动重新上线
+[12:25:00] Socket 已断开
+[12:25:01] Socket 已连接 /orderService
+[12:30:06] Socket 已断开
+[12:30:08] Socket 已连接 /orderService
+[13:18:39] 在线倒计时结束，已自动重新上线
+[13:19:42] 在线倒计时结束，已自动重新上线
+[13:47:52] Socket 已断开
+[13:47:53] Socket 已连接 /orderService
+[13:58:28] Socket 已断开
+[13:58:28] Socket 已连接 /orderService
+[14:02:14] Socket 已断开
+[14:02:15] Socket 已连接 /orderService
+[14:17:34] Socket 已断开
+[14:17:34] Socket 连接异常: Client is not in a disconnected state
+[14:17:35] Socket 已连接 /orderService
+[14:18:47] 在线倒计时结束，已自动重新上线
+[14:19:49] 在线倒计时结束，已自动重新上线
+[14:35:07] Socket 已断开
+[14:35:07] Socket 连接异常: Client is not in a disconnected state
+[14:35:08] Socket 已连接 /orderService
+[14:43:34] Socket 已断开
+[14:43:35] Socket 已连接 /orderService
+[15:11:24] Socket 已断开
+[15:11:25] Socket 已连接 /orderService
+[15:11:25] Socket 已连接 /orderService
+[15:11:25] Socket 已连接 /orderService
+[15:13:56] Socket 已断开
+[15:13:57] Socket 已连接 /orderService
+[15:13:57] Socket 已连接 /orderService
+[15:15:30] Socket 已断开
+[15:15:30] Socket 已连接 /orderService
+[15:17:20] Socket 已断开
+[15:17:22] Socket 已连接 /orderService
+[15:17:22] Socket 已断开
+[15:17:24] Socket 已连接 /orderService
+[15:18:56] 在线倒计时结束，已自动重新上线
+[15:19:51] 在线倒计时结束，已自动重新上线
+[15:21:48] Socket 已断开
+[15:21:49] Socket 连接异常: Client is not in a disconnected state
+[15:21:49] Socket 已连接 /orderService
+[15:47:41] Socket 已断开
+[15:47:42] Socket 已连接 /orderService
+[15:47:43] Socket 已连接 /orderService
+[15:47:56] Socket 已断开
+[15:47:57] Socket 已连接 /orderService
+[16:09:15] Socket 已断开
+[16:09:16] Socket 已连接 /orderService
+[16:09:16] Socket 已断开
+[16:09:16] Socket 已连接 /orderService
+[16:16:13] Socket 已断开
+[16:16:14] Socket 已连接 /orderService
+[16:18:53] 在线倒计时结束，已自动重新上线
+[16:19:56] 在线倒计时结束，已自动重新上线
+[16:22:30] Socket 已断开
+[16:22:31] Socket 已连接 /orderService
+[16:23:17] Socket 已断开
+[16:23:18] Socket 连接异常: Client is not in a disconnected state
+[16:23:19] Socket 已连接 /orderService
+[16:24:09] Socket 已断开
+[16:24:09] Socket 已连接 /orderService
+[16:29:32] Socket 已断开
+[16:29:33] Socket 已连接 /orderService
+[16:29:34] Socket 已断开
+[16:29:35] Socket 已连接 /orderService
+[16:33:45] Socket 已断开
+[16:33:46] Socket 已连接 /orderService
+[16:47:33] Socket 已断开
+[16:47:34] Socket 已连接 /orderService
+[16:49:57] Socket 已断开
+[16:49:58] Socket 已连接 /orderService
+[16:54:16] Socket 已断开
+[16:54:17] Socket 已连接 /orderService
+[16:54:17] Socket 已断开
+[16:54:18] Socket 已连接 /orderService
+[17:00:29] [Socket] 收到 50 个 → 已提交
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037345407 | USDT 373.2683 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037341311 | USDT 609.1191 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037347906 | USDT 487.5162 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037347554 | USDT 604.1786 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037344296 | USDT 677.8438 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037338344 | USDT 584.5378 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037339588 | USDT 311.9829 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037341873 | USDT 450.8344 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037347425 | USDT 702.6876 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037342537 | USDT 396.9364 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037341744 | USDT 366.2236 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037348094 | USDT 414.25 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037346272 | USDT 458.7829 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037342975 | USDT 389.7726 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037339669 | USDT 416.9315 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037342957 | USDT 417.7624 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037343190 | USDT 607.5569 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037347967 | USDT 413.5541 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037343127 | USDT 1622.6234 | 率 0.6
+[17:00:31] [Socket][抢单] 接单成功: ORDER20260706170037339138 | USDT 414.7412 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037342905 | USDT 618.1469 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037344697 | USDT 604.3378 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037348916 | USDT 457.1099 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037340803 | USDT 327.6339 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037346112 | USDT 537.5991 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037343309 | USDT 443.3966 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037337780 | USDT 681.4994 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037343092 | USDT 633.6617 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037341376 | USDT 607.8471 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037343260 | USDT 553.7609 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037340451 | USDT 592.2179 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037341912 | USDT 446.5743 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037345239 | USDT 307.2062 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037340409 | USDT 637.9251 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037340582 | USDT 557.1848 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037345630 | USDT 472.0137 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037345625 | USDT 591.8045 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037340486 | USDT 685.4254 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037344287 | USDT 706.1755 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037339019 | USDT 471.9784 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037348074 | USDT 363.3774 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037346776 | USDT 561.6307 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037346581 | USDT 401.3602 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037343084 | USDT 324.1692 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037347893 | USDT 304.9882 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037344053 | USDT 652.1388 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037344162 | USDT 596.5164 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037339569 | USDT 456.5262 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037341006 | USDT 356.083 | 率 0.6
+[17:00:32] [Socket][抢单] 接单成功: ORDER20260706170037342604 | USDT 410.7421 | 率 0.6
+
